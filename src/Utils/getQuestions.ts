@@ -58,8 +58,7 @@ const getQuestions = async ()  => {
     }
 
   } catch(e) {
-    console.error({ e })
-    console.log(typeof e)
+    throw e
   }
 
 

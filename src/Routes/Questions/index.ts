@@ -4,11 +4,13 @@ import getQuestions from '../../Utils/getQuestions'
 
 const router = Router()
 
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (req: Request, res: Response) => {
+  
   await getQuestions()
     .then((question) => {
       try {
-        return res.json({ question })
+        const resquestTime = new Date().getTime()
+        return res.json({ question, requestServerTime: resquestTime })
       } catch (e) {
         throw new Error("failed to parse json");
       }

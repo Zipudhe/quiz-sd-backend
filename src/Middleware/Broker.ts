@@ -19,7 +19,8 @@ used to ensure that any class that wants to act as a broker in the application m
 methods implemented. */
 interface IBroker {
   subscribe: (topic: string, callback: () => void) => void
-  publish: (topic: string) => void
+  publish: (topic: string) => void,
+  unsubscribe: (topic: string) => void
 }
 
 /* The Broker class implements the IBroker interface and allows for subscribing to and publishing
@@ -40,11 +41,19 @@ class Broker implements IBroker {
 
   publish(topic: string) {
     if(this.subscribers[topic]) {
+      console.log(`publishing to topic ${topic}`)
       this.subscribers[topic].forEach(callback => {
         callback()
       })
     }
   } 
+
+  unsubscribe(topic: string) {
+    if(this.subscribers[topic]) {
+      // may change this
+      this.subscribers[topic].pop()
+    }
+  }
 }
 
 export default Broker

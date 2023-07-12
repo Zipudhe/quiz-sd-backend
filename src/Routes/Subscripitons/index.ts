@@ -1,7 +1,8 @@
 /* This is a module that defines a set of routes for subscribing to events using Server-Sent Events
 (SSE) in an Express.js application. */
 import express, { Request } from 'express'
-import { app } from '../../index'
+import { app, client } from '../../index'
+import { SessionData } from "../Session"
 
 const router = express.Router()
 
@@ -12,23 +13,45 @@ const router = express.Router()
  */
 
 // subscribes to watch joning players
-router.get('/:session', (req: Request<{ session: string }>, res) => {
-  const { session } = req.params
+router.get('/:session/:userId', async (req: Request<{ session: string, userId: string }>, res) => {
+  const { session, userId } = req.params
   const { Broker } = app.locals
+
+  const currentSession = await client.get(session)
+    .then(session => JSON.parse(session) as SessionData)
   
+  if(!currentSession) {
+    return res.status(400)
+  }
+
+  if(currentSession.users.length == 4) {
+    return res.status(400).json({ message: 'session is full' })
+  }
+
+  // updates current sesssion with new user
+  if(!currentSession.users.find(user => Object.keys(user)[0] == userId)) {
+    currentSession.users.push({ [userId]: 0 })
+    client.set(session, JSON.stringify(currentSession))
+  }
+
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
   res.setHeader('Connection', 'keep-alive')
 
-  console.log(`Subscribed to events of join in session: ${session}`)
+  console.log(`Subscribed to events of join in session: ${session} with user: ${userId}`)
+  // get on redis all current users on session and send this data
+  Broker.subscribe(session, async() => {
+    const currentSession = await client.get(session)
+    .then(session => JSON.parse(session) as SessionData)
 
-  Broker.subscribe(session, () => {
     res.write('event: joined\n')
-    res.write('data: connect\n\n')
+    res.write(`data: ${currentSession.users.length}\n\n`)
   })
 
+  Broker.publish(session)
+
   res.on('close', () => {
-    console.log('closed subscribing connection')
+    Broker.unsubscribe(session)
   })
 })
 
@@ -46,7 +69,7 @@ router.get('/start/:session', (req: Request<{ session: string }>, res) => {
 
   Broker.subscribe(`start_${session}`, () => {
     res.write('event: start\n')
-    res.write('data: starting\n\n')
+    res.write(`data: ${new Date().toString()}\n\n`)
   })
 
   res.on('close', () => {
@@ -54,6 +77,7 @@ router.get('/start/:session', (req: Request<{ session: string }>, res) => {
   })
 })
 
+// subscribes to a question
 router.get('/:session/question/:id', (req: Request<{ session: string, id: string }>, res) => {
   const { session, id } = req.params
   const { Broker } = app.locals
